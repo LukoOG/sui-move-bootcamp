@@ -3,8 +3,8 @@ public struct Hero has key, store {
     id: object::UID,
 }
 
-public struct Pebble has drop, store {
-    size: u8,
+public struct InsignificantWeapon has drop, store {
+    power: u8,
 }
 
 public fun mint_hero(ctx: &mut TxContext): Hero {
@@ -12,8 +12,8 @@ public fun mint_hero(ctx: &mut TxContext): Hero {
     hero
 }
 
-public fun make_pebble(size: u8): Pebble {
-    Pebble { size }
+public fun create_insignificant_weapon(power: u8): InsignificantWeapon {
+    InsignificantWeapon { power }
 }
 
 #[test]
