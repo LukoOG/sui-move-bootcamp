@@ -8,8 +8,10 @@ module publisher::hero {
         id: UID,
         name: String,
     }
+	
+	struct HERO has drop {}
 
-    fun init(ctx: &mut TxContext) {
+    fun init(otw: HERO, ctx: &mut TxContext) {
         // create Publisher and transfer it to the publisher wallet
     }
 

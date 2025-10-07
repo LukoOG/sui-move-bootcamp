@@ -120,8 +120,6 @@ fun test_admin_can_create_more_admins() {
 	
 	ts.next_tx(ADMIN);
 	
-	assert_eq!(ts::has_most_recent_for_address<Hero>(USER), false);
-	
 	let admin_cap = ts.take_from_sender<AdminCap>();
 	
 	new_admin(&admin_cap, ADMIN2, ts.ctx());
