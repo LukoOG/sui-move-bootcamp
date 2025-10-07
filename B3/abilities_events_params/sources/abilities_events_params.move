@@ -7,33 +7,145 @@ const EMedalOfHonorNotAvailable: u64 = 111;
 
 // Structs
 
-public struct Hero has key {
+public struct Hero has key, store {
     id: UID, // required
     name: String,
+	medals: vector<Medal>,
+}
+
+public struct HeroRegistry has key {
+	id: UID,
+	heroes: vector<ID>,
+}
+
+public struct Medal has key, store{
+	id: UID,
+	name: String,
+}
+
+public struct MedalStorage has key {
+	id: UID,
+	medals: vector<Medal>,
+}
+
+//Events
+public struct HeroMinted has copy, drop {
+	hero_id: ID,
+	owner: address,
 }
 
 // Module Initializer
-fun init(ctx: &mut TxContext) {}
+fun init(ctx: &mut TxContext) {
+	//define medals
+	let medalNames: vector<String> = vector[
+		b"Medal of Honor".to_string(), 
+		b"Black Knight Honor".to_string(), 
+		b"Black Knight Honor".to_string(), 
+		b"Medal of Honor".to_string(), 
+		b"WWII honor of valor".to_string(),
+	];
+	
+	let mut medalStorage = MedalStorage {
+		id: object::new(ctx),
+		medals: vector[]
+	};
+	
+	let mut i = 0;
+	let lengthMedalNames = medalNames.length();
+	
+	while(i < lengthMedalNames){
+		let medal = Medal {
+			id: object::new(ctx),
+			name: *vector::borrow(&medalNames, i),
+		};
+		
+		medalStorage.medals.push_back(medal);
+		
+		i = i + 1;
+	};
+	
+	transfer::share_object(medalStorage);
+	
+	//define hero regisry
+	let heroRegistry = HeroRegistry {
+		id: object::new(ctx),
+		heroes: vector[],
+	};
+	
+	transfer::share_object(heroRegistry);
+	
+}
 
-public fun mint_hero(name: String, ctx: &mut TxContext): Hero {
+public fun mint_hero(registry: &mut HeroRegistry, name: String, ctx: &mut TxContext): Hero {
     let freshHero = Hero {
         id: object::new(ctx), // creates a new UID
         name,
+		medals: vector[]
     };
+	
+	registry.heroes.push_back(object::id(&freshHero));
+	
+	let hero_event = HeroMinted {
+		hero_id: object::id(&freshHero),
+		owner: ctx.sender(),
+	};
+	
+	event::emit(hero_event);
     freshHero
 }
 
-public fun mint_and_keep_hero(name: String, ctx: &mut TxContext) {
-    let hero = mint_hero(name, ctx);
+#[allow(lint(self_transfer))]
+public fun mint_and_keep_hero(registry: &mut HeroRegistry, name: String, ctx: &mut TxContext) {
+    let hero = mint_hero(registry, name, ctx);
     transfer::transfer(hero, ctx.sender());
+}
+
+fun award_medal(hero: &mut Hero, medal_storage: &mut MedalStorage, medalName: String){
+	let medalOption = get_medal(medalName, medal_storage);
+	
+	//Assert that medal option is not empty -> it hasn't been previously awarded to someone else
+	assert!(medalOption.is_some(), EMedalOfHonorNotAvailable);
+	
+	hero.medals.append(medalOption.to_vec())
+}
+
+fun get_medal(name: String, medalStorage: &mut MedalStorage): option::Option<Medal>{
+	let mut i: u64 = 0;
+	let length = medalStorage.medals.length();
+	
+	while(i < length){
+		if(medalStorage.medals[i].name == name){
+			let extractedMedal = vector::remove(&mut medalStorage.medals, i);
+			return option::some(extractedMedal)
+		};
+		i = i + 1;
+	};
+	
+	option::none<Medal>()
+}
+
+public fun award_medal_of_custom(hero: &mut Hero, medal_storage: &mut MedalStorage, medalName: String){
+	award_medal(hero, medal_storage, medalName)
+}
+
+public fun award_medal_of_cross(hero: &mut Hero, medal_storage: &mut MedalStorage){
+	award_medal(hero, medal_storage, b"Air Force Cross".to_string())
+}
+
+public fun award_medal_of_honor(hero: &mut Hero, medal_storage: &mut MedalStorage){
+	award_medal(hero, medal_storage, b"Black Knight Honor".to_string())
+}
+
+public fun award_medal_of_valor(hero: &mut Hero, medal_storage: &mut MedalStorage){
+	award_medal(hero, medal_storage, b"WWII honor of valor".to_string())
 }
 
 /////// Tests ///////
 
 #[test_only]
 use sui::test_scenario as ts;
-#[test_only]
-use sui::test_scenario::{take_shared, return_shared};
+//#[test_only]
+//use sui::test_scenario::{take_shared, return_shared};
 #[test_only]
 use sui::test_utils::{destroy};
 #[test_only]
@@ -55,11 +167,17 @@ fun test_hero_creation() {
     test.next_tx(@USER);
 
     //Get hero Registry
+	let mut test_registry = HeroRegistry{
+		id: object::new(test.ctx()),
+		heroes: vector[],
+	};
+	test.next_tx(@USER);
 
-    let hero = mint_hero(b"Flash".to_string(), test.ctx());
+    let hero = mint_hero(&mut test_registry, b"Flash".to_string(), test.ctx());
     assert_eq!(hero.name, b"Flash".to_string());
 
     destroy(hero);
+	destroy(test_registry);
     test.end();
 }
 
