@@ -1,4 +1,9 @@
 import { SuiTransactionBlockResponse } from "@mysten/sui/client";
+import { Transaction } from "@mysten/sui/transactions"
+import { ENV } from "../env"
+import { getSigner } from "./getSigner"
+import { getAddress } from "./getAddress"
+import { suiClient } from "../suiClient"
 
 /**
  * Builds, signs, and executes a transaction for:
@@ -9,6 +14,39 @@ import { SuiTransactionBlockResponse } from "@mysten/sui/client";
  */
 export const mintHeroWithSword =
   async (): Promise<SuiTransactionBlockResponse> => {
-    // TODO: Implement this function
-    return {} as SuiTransactionBlockResponse;
+    
+	const tx = new Transaction()
+	
+	//1. mint Hero
+	const Hero = tx.moveCall({
+		target: `${ENV.PACKAGE_ID}::hero::mint_hero`,
+		arguments: [],
+		typeArguments: [],
+	})
+	//2. mint sword
+	const Sword = tx.moveCall({
+		target: `${ENV.PACKAGE_ID}::blacksmith::new_sword`,
+		arguments: [ tx.pure.u64(120) ],
+		typeArguments: [],
+	})
+	//3. Attaching the sword to the Hero
+	tx.moveCall({
+		target: `${ENV.PACKAGE_ID}::hero::equip_sword`,
+		arguments: [ Hero, Sword ],
+		typeArguments: [
+			`${ENV.PACKAGE_ID}::hero::Hero`, 
+			`${ENV.PACKAGE_ID}::blacksmith::Sword`
+		],
+	})
+	tx.transferObjects([Hero], getAddress({ secretKey: ENV.USER_SECRET_KEY }));
+	tx.setGasPrice(5000);
+	const response  = suiClient.signAndExecuteTransaction({
+		transaction: tx,
+		signer: getSigner({ secretKey: ENV.USER_SECRET_KEY }),
+		options: {
+			showEffects: true,
+			showObjectChanges: true,
+		}
+	})
+    return response;
   };
